@@ -143,6 +143,34 @@ function load_interface_for(model::String)
     end
 end
 
+# Structures to implement Gergo's Tuning https://nbviewer.jupyter.org/github/gbohner/Julia-Machine-Learning-Review/blob/f3482badf1f275e2a98bf7e338d406d399609f37/MLR/TuningDispatch_framework.ipynb
+abstract type BaseTuning end
+
+struct SimpleGridTuning <: BaseTuning
+    grid
+end
+
+struct ModelSelectTuning <: BaseTuning
+    models
+end
+
+struct TunedModel{T<:BaseModel} <: BaseModel
+    model :: T
+    tuning :: BaseTuning
+end
+
+# Accessor functions (for compile-time lookup gain)
+model(tunedModel::TunedModel) = tunedModel.model
+tuning(tunedModel::TunedModel) = tunedModel.tuning
+
+struct TunedModelFit{T} <: BaseModelFit{T}
+    model :: T
+    fit_result
+    tuning :: BaseTuning
+    tuning_result
+end
+model(modelFit::TunedModelFit) = modelFit.model
+
 # Begin of OLD CODE
 """
     Contains task type (regression,classification,..)
