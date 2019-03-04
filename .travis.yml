@@ -22,12 +22,17 @@ matrix:
 jobs:
   include:
     - stage: "Documentation"
-      julia: 1.1
+      julia: 1.0
       os: linux
+      # disable global before_script in order not to install Compose twice
+      before_script:
       script:
-        - julia --project=docs -e 'using Pkg; Pkg.instantiate()'
-- julia --project=docs --color=yes docs/make.jl
-      after_success: skip
-after_success:
-  - julia --project=test/coverage -e 'using Pkg; Pkg.instantiate()'
-  - julia --project=test/coverage test/coverage/coverage.jl
+        - |
+          julia --color=yes --project=docs/ -e'
+            using Pkg
+            Pkg.add(PackageSpec(name="Documenter", rev="master"))
+            Pkg.develop(PackageSpec(path=pwd()))
+            Pkg.instantiate()
+            include("docs/make.jl")
+          '
+after_success: skip
