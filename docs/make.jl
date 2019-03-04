@@ -14,8 +14,7 @@ makedocs(
 )
 
 deploydocs(
-    repo = "github.com/ysimillides/MLJ.jl.git",
-    target = "build",
+    repo = "github.com/ysimillides/MLJ.jl.git"
 )
 
 #    modules = [MLJ]
