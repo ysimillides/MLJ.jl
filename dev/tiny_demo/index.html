@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>- · MLJ</title><link href="https://cdnjs.cloudflare.com/ajax/libs/normalize/4.2.0/normalize.min.css" rel="stylesheet" type="text/css"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.2.0/require.min.js" data-main="../assets/documenter.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link href="../assets/documenter.css" rel="stylesheet" type="text/css"/></head><body><nav class="toc"><h1>MLJ</h1><select id="version-selector" onChange="window.location.href=this.value" style="visibility: hidden"></select><form class="search" id="search-form" action="../search/"><input id="search-query" name="q" type="text" placeholder="Search docs"/></form><ul><li><a class="toctext" href="../adding_new_models/">Implementing the MLJ interface for a learning algorithm</a></li><li><a class="toctext" href="../">MLJ.jl</a></li><li><a class="toctext" href="../internals/">MLJ Internals</a></li><li class="current"><a class="toctext" href>-</a><ul class="internal"></ul></li></ul></nav><article id="docs"><header><nav><ul><li><a href>-</a></li></ul><a class="edit-page" href="https://github.com/ysimillides/MLJ.jl/blob/master/docs/src/tiny_demo.md"><span class="fa"></span> Edit on GitHub</a></nav><hr/><div id="topbar"><span>-</span><a class="fa fa-bars" href="#"></a></div></header><h3><a class="nav-anchor" id="Basic-training-and-testing-1" href="#Basic-training-and-testing-1">Basic training and testing</a></h3><pre><code class="language-julia">using MLJ
+using DataFrames
+
+task = load_boston()
+X, y = X_and_y(task);
+
+X = DataFrame(X) # or any other tabular format supported by Table.jl 
+
+train, test = partition(eachindex(y), 0.7); # 70:30 split</code></pre><p>A <em>model</em> is a container for hyperparameters:</p><pre><code class="language-julia">knn_model=KNNRegressor(K=10)</code></pre><pre><code class="language-none"># KNNRegressor{Float64} @ 1…90: 
+target_type             =&gt;   Float64
+K                       =&gt;   10
+metric                  =&gt;   euclidean (generic function with 1 method)
+kernel                  =&gt;   reciprocal (generic function with 1 method)</code></pre><p>Wrapping the model in data creates a <em>machine</em> which will store training outcomes (called <em>fit-results</em>):</p><pre><code class="language-julia">knn = machine(knn_model, X, y)</code></pre><pre><code class="language-none"># Machine{KNNRegressor{Float64}} @ 9…72: 
+model                   =&gt;   KNNRegressor{Float64} @ 1…90
+fitresult               =&gt;   (undefined)
+cache                   =&gt;   (undefined)
+args                    =&gt;   (omitted Tuple{DataFrame,Array{Float64,1}} of length 2)
+report                  =&gt;   empty Dict{Symbol,Any}
+rows                    =&gt;   (undefined)</code></pre><p>Training on the training rows and evaluating on the test rows:</p><pre><code class="language-julia">fit!(knn, rows=train)
+yhat = predict(knn, X[test,:])
+rms(y[test], yhat)</code></pre><pre><code class="language-none">┌ Info: Training Machine{KNNRegressor{Float64}} @ 9…72.
+└ @ MLJ /Users/anthony/Dropbox/Julia7/MLJ/src/machines.jl:69
+8.090639098853249</code></pre><p>Or, in one line:</p><pre><code class="language-julia">evaluate!(knn, resampling=Holdout(fraction_train=0.7))</code></pre><pre><code class="language-none">8.090639098853249</code></pre><p>Changing a hyperparameter and re-evaluating:</p><pre><code class="language-julia">knn_model.K = 20
+evaluate!(knn, resampling=Holdout(fraction_train=0.7))</code></pre><pre><code class="language-none">8.41003854724935</code></pre><h3><a class="nav-anchor" id="Systematic-tuning-as-a-model-wrapper-1" href="#Systematic-tuning-as-a-model-wrapper-1">Systematic tuning as a model wrapper</a></h3><p>A simple example of a composite model is a homogeneous ensemble. Here&#39;s a bagged ensemble model for 20 K-nearest neighbour regressors:</p><pre><code class="language-julia">ensemble_model = EnsembleModel(atom=knn_model, n=20) </code></pre><pre><code class="language-none"># DeterministicEnsembleModel @ 5…24: 
+atom                    =&gt;   KNNRegressor{Float64} @ 1…90
+weights                 =&gt;   0-element Array{Float64,1}
+bagging_fraction        =&gt;   0.8
+rng_seed                =&gt;   0
+n                       =&gt;   20
+parallel                =&gt;   true</code></pre><p>Let&#39;s simultaneously tune the ensemble&#39;s <code>bagging_fraction</code> and the K-nearest neighbour hyperparameter <code>K</code>. Since one of these models is a field of the other, we have nested hyperparameters:</p><pre><code class="language-julia">params(ensemble_model)</code></pre><pre><code class="language-none">Params(:atom =&gt; Params(:target_type =&gt; Float64, :K =&gt; 20, :metric =&gt; MLJ.KNN.euclidean, :kernel =&gt; MLJ.KNN.reciprocal), :weights =&gt; Float64[], :bagging_fraction =&gt; 0.8, :rng_seed =&gt; 0, :n =&gt; 20, :parallel =&gt; true)</code></pre><p>To define a tuning grid, we construct ranges for the two parameters and collate these ranges following the same pattern above (omitting parameters that don&#39;t change):</p><pre><code class="language-julia">B_range = range(ensemble_model, :bagging_fraction, lower= 0.5, upper=1.0, scale = :linear)
+K_range = range(knn_model, :K, lower=1, upper=100, scale=:log10)
+nested_ranges = Params(:atom =&gt; Params(:K =&gt; K_range), :bagging_fraction =&gt; B_range)</code></pre><pre><code class="language-none">Params(:atom =&gt; Params(:K =&gt; NumericRange @ 1…75), :bagging_fraction =&gt; NumericRange @ 1…56)</code></pre><p>Now we choose a tuning strategy, and a resampling strategy (for estimating performance), and wrap these strategies around our ensemble model to obtain a new model:</p><pre><code class="language-julia">tuning = Grid(resolution=12)
+resampling = CV(nfolds=6)
+
+tuned_ensemble_model = TunedModel(model=ensemble_model, 
+    tuning=tuning, resampling=resampling, nested_ranges=nested_ranges)</code></pre><pre><code class="language-none"># DeterministicTunedModel @ 1…93: 
+model                   =&gt;   DeterministicEnsembleModel @ 5…24
+tuning                  =&gt;   Grid @ 1…37
+resampling              =&gt;   CV @ 6…31
+measure                 =&gt;   nothing
+operation               =&gt;   predict (generic function with 19 methods)
+nested_ranges           =&gt;   Params(:atom =&gt; Params(:K =&gt; NumericRange @ 1…75), :bagging_fraction =&gt; NumericRange @ 1…56)
+report_measurements     =&gt;   true</code></pre><p>Fitting the corresponding machine tunes the underlying model (in this case an ensemble) and retrains on all supplied data:</p><pre><code class="language-julia">tuned_ensemble = machine(tuned_ensemble_model, X[train,:], y[train])
+fit!(tuned_ensemble);</code></pre><pre><code class="language-none">┌ Info: Training Machine{MLJ.DeterministicTunedMo…} @ 1…05.
+└ @ MLJ /Users/anthony/Dropbox/Julia7/MLJ/src/machines.jl:69
+Searching a 132-point grid for best model: 100%[=========================] Time: 0:01:20
+┌ Info: Training best model on all supplied data.
+└ @ MLJ /Users/anthony/Dropbox/Julia7/MLJ/src/tuning.jl:130</code></pre><pre><code class="language-julia">tuned_ensemble.report</code></pre><pre><code class="language-none">Dict{Symbol,Any} with 4 entries:
+  :measurements     =&gt; [7.03102, 6.09291, 6.05707, 5.93617, 5.86848, 5.73299, 5…
+  :models           =&gt; DeterministicEnsembleModel{Tuple{Array{Float64,2},Array{…
+  :best_model       =&gt; DeterministicEnsembleModel @ 3…49
+  :best_measurement =&gt; 5.46102</code></pre><pre><code class="language-julia">best_model = tuned_ensemble.report[:best_model]
+@show best_model.bagging_fraction
+@show best_model.atom.K</code></pre><pre><code class="language-none">best_model.bagging_fraction = 0.7272727272727273
+(best_model.atom).K = 100</code></pre><footer><hr/><a class="previous" href="../internals/"><span class="direction">Previous</span><span class="title">MLJ Internals</span></a></footer></article></body></html>
