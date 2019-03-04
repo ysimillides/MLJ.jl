@@ -1,6 +1,3 @@
-using Pkg
-Pkg.add("Documenter")
-Pkg.clone("https://github.com/ysimillides/MLJ.jl")
 using Documenter
 using MLJ
 
