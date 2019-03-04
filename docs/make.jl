@@ -12,7 +12,7 @@ makedocs(
 )
 
 deploydocs(
-    repo = "https://github.com/ysimillides/MLJ.jl"
+    repo = "github.com/ysimillides/MLJ.jl.git"
 )
 
 #    modules = [MLJ]
