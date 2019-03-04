@@ -3,18 +3,24 @@ if Base.HOME_PROJECT[] !== nothing
 end
 using Pkg
 #Pkg.add("Documenter")
-Pkg.clone("https://github.com/wildart/TOML.jl")
-Pkg.clone("https://github.com/alan-turing-institute/MLJBase.jl")
-Pkg.clone("https://github.com/alan-turing-institute/MLJModels.jl")
-Pkg.clone("https://github.com/alan-turing-institute/MLJ.jl")
+#Pkg.clone("https://github.com/wildart/TOML.jl")
+#Pkg.clone("https://github.com/alan-turing-institute/MLJBase.jl")
+#Pkg.clone("https://github.com/alan-turing-institute/MLJModels.jl")
+#Pkg.clone("https://github.com/alan-turing-institute/MLJ.jl")
 using Documenter
 using MLJ
+using MLJBase
+using MLJModels
 
 #prettyurls to be changed
 makedocs(
     sitename = "MLJ",
     format = Documenter.HTML(),
-    modules = [MLJ]
+    modules = [MLJ,MLJBase,MLJModels],
+    pages = Any["News"=>"NEWS.md","Getting Started"=>"getting_started.md",
+    "Developing"=>Any["Glossary"=>"glossary.md","Internals"=>"internals.md","Adding new Models"=>
+"adding_new_models.md"],
+   "Documentation"=>"index.md"]
 )
 
 deploydocs(

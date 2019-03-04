@@ -13,11 +13,7 @@ Documentation for MLJ.jl
 ```
 
 ```@autodocs
-Modules = [MLJ]
-```
-
-```@autodocs
-Modules = [MLJ.KNN]
+Modules = [MLJ,MLJBase,MLJModels]
 ```
 
 
