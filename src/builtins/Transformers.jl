@@ -17,7 +17,9 @@ using Statistics
 using Tables
 
 # to be extended:
-import MLJBase: fit, transform, inverse_transform
+import MLJBase: fit, transform, inverse_transform, scitype
+import MLJBase: Found, Continuous, Discrete, Multiclass
+import MLJBase: FiniteOrderedFactor, Other, OrderedFactor, Count
 
 
 ## CONSTANTS
@@ -31,9 +33,9 @@ const N_VALUES_THRESH = 16 # for BoxCoxTransformation
 """
     FeatureSelector(features=Symbol[])
 
-An usupervised model for filtering features (columns) of a table.
+An unsupervised model for filtering features (columns) of a table.
 Only those features encountered during fitting will appear in
-transformed tables, these features appearing encountered.
+transformed tables if `features` is empty (the default).
 Alternatively, if a non-empty `features` is specified, then only the
 specified features are used. Throws an error if a recorded or
 specified feature is not present in the transformation input.
@@ -70,10 +72,10 @@ MLJBase.load_path(::Type{<:FeatureSelector}) = "MLJ.FeatureSelector"
 MLJBase.package_url(::Type{<:FeatureSelector}) = "https://github.com/alan-turing-institute/MLJ.jl"
 MLJBase.package_name(::Type{<:FeatureSelector}) = "MLJ"
 MLJBase.package_uuid(::Type{<:FeatureSelector}) = ""
-MLJBase.is_pure_julia(::Type{<:FeatureSelector}) = :yes
-MLJBase.input_kinds(::Type{<:FeatureSelector}) = [:continuous, :multiclass, :ordered_factor_finite, :ordered_factor_infinite, :missing]
-MLJBase.output_kind(::Type{<:FeatureSelector}) = :mixed
-MLJBase.output_quantity(::Type{<:FeatureSelector}) = :multivariate
+MLJBase.is_pure_julia(::Type{<:FeatureSelector}) = true
+MLJBase.input_scitypes(::Type{<:FeatureSelector}) = Union{Missing,MLJBase.Found}
+MLJBase.output_scitypes(::Type{<:FeatureSelector}) = Union{Missing,MLJBase.Found}
+MLJBase.output_is_multivariate(::Type{<:FeatureSelector}) = true
 
 
 ## FOR RELABELLING BY CONSECUTIVE INTEGERS
@@ -84,9 +86,12 @@ MLJBase.output_quantity(::Type{<:FeatureSelector}) = :multivariate
 """
     ToIntTransformer
 
-Univariate transformer for relabelling with consecutive integers. Does
-not keep all levels of a `CategoricalVector` - only those manifest in
-the fitting input.
+Univariate transformer for relabelling data of any type with
+consecutive integers. Does not keep all levels of a
+`CategoricalVector` - only those manifest in the fitting input. 
+
+Somewhat obsolete given new requirements for categorical data. May be
+depreciated in favour of MLJBase.CategoricalDecoder.
 
 See also: MLJBase.CategoricalDecoder
 """
@@ -173,11 +178,11 @@ MLJBase.load_path(::Type{<:ToIntTransformer}) = "MLJ.ToIntTransformer"
 MLJBase.package_url(::Type{<:ToIntTransformer}) = "https://github.com/alan-turing-institute/MLJ.jl"
 MLJBase.package_name(::Type{<:ToIntTransformer}) = "MLJ"
 MLJBase.package_uuid(::Type{<:ToIntTransformer}) = ""
-MLJBase.is_pure_julia(::Type{<:ToIntTransformer}) = :yes
-MLJBase.input_kinds(::Type{<:ToIntTransformer}) = [:multiclass, :ordered_factor_finite]
-MLJBase.input_quantity(::Type{<:ToIntTransformer}) = :univariate
-MLJBase.output_kind(::Type{<:ToIntTransformer}) = :multiclass
-MLJBase.output_quantity(::Type{<:ToIntTransformer}) = :univariate
+MLJBase.is_pure_julia(::Type{<:ToIntTransformer}) = true
+MLJBase.input_scitypes(::Type{<:ToIntTransformer}) = MLJBase.Discrete
+MLJBase.input_is_multivariate(::Type{<:ToIntTransformer}) = false
+MLJBase.output_scitypes(::Type{<:ToIntTransformer}) = Count
+MLJBase.output_is_multivariate(::Type{<:ToIntTransformer}) = false
 
 
 ## UNIVARIATE STANDARDIZATION
@@ -220,11 +225,11 @@ MLJBase.load_path(::Type{<:UnivariateStandardizer}) = "MLJ.UnivariateStandardize
 MLJBase.package_url(::Type{<:UnivariateStandardizer}) = "https://github.com/alan-turing-institute/MLJ.jl"
 MLJBase.package_name(::Type{<:UnivariateStandardizer}) = "MLJ"
 MLJBase.package_uuid(::Type{<:UnivariateStandardizer}) = ""
-MLJBase.is_pure_julia(::Type{<:UnivariateStandardizer}) = :yes
-MLJBase.input_kinds(::Type{<:UnivariateStandardizer}) = [:multiclass, :ordered_factor_finite]
-MLJBase.input_quantity(::Type{<:UnivariateStandardizer}) = :univariate
-MLJBase.output_kind(::Type{<:UnivariateStandardizer}) = :multiclass
-MLJBase.output_quantity(::Type{<:UnivariateStandardizer}) = :univariate
+MLJBase.is_pure_julia(::Type{<:UnivariateStandardizer}) = true
+MLJBase.input_scitypes(::Type{<:UnivariateStandardizer}) = Union{Continuous, OrderedFactor}
+MLJBase.input_is_multivariate(::Type{<:UnivariateStandardizer}) = false
+MLJBase.output_scitypes(::Type{<:UnivariateStandardizer}) = Continuous
+MLJBase.output_is_multivariate(::Type{<:UnivariateStandardizer}) = false
 
 
 ## STANDARDIZATION OF ORDINAL FEATURES OF TABULAR DATA
@@ -233,9 +238,9 @@ MLJBase.output_quantity(::Type{<:UnivariateStandardizer}) = :univariate
     Standardizer(; features=Symbol[])
 
 Unsupervised model for standardizing (whitening) the columns of
-tabular data. If `features` is empty then all columns of eltype
-`AbstractFloat` will be standardized. For different behaviour, specify
-the names of features to be standardized. 
+tabular data. If `features` is empty then all columns `v` for which
+`scitype(v) <: Continuous` are standardized. For different behaviour,
+specify the names of features to be standardized.
 
     using DataFrames
     X = DataFrame(x1=[0.2, 0.3, 1.0], x2=[4, 2, 3])
@@ -250,17 +255,6 @@ the names of features to be standardized.
     │ 2   │ -0.458831 │ 2     │
     │ 3   │ 1.14708   │ 3     │
 
-    stand_model.features=[:x1, :x2]
-    transform(fit!(machine(stand_model, X)), X)
-
-    3×2 DataFrame
-    │ Row │ x1        │ x2      │
-    │     │ Float64   │ Float64 │
-    ├─────┼───────────┼─────────┤
-    │ 1   │ -0.688247 │ 1.0     │
-    │ 2   │ -0.458831 │ -1.0    │
-    │ 3   │ 1.14708   │ 0.0     │
-
 """
 mutable struct Standardizer <: Unsupervised
     features::Vector{Symbol} # features to be standardized; empty means all of
@@ -273,21 +267,18 @@ Standardizer(; features=Symbol[]) = Standardizer(features)
 StandardizerFitResult() = StandardizerFitResult(zeros(0,0), Symbol[], Bool[])
 
 function fit(transformer::Standardizer, verbosity::Int, X::Any)
-    # if using Query.jl, replace below code with
-    # all_features = df |> @take(1) |> @map(fieldnames(typeof(_))) |> @mapmany(_, __)
-    # Since this is a really dirty way of proceeding, I've used
-    # Tables.jl for now.
+
     _schema =  schema(X)
     all_features = _schema.names
     
     # determine indices of all_features to be transformed
     if isempty(transformer.features)
         cols_to_fit = filter!(eachindex(all_features)|>collect) do j
-            _schema.eltypes[j] <: AbstractFloat
+            scitype(MLJBase.selectcols(X, j)) <: Continuous
         end
     else
         cols_to_fit = filter!(eachindex(all_features)|>collect) do j
-            all_features[j] in transformer.features && _schema.eltypes[j] <: Real
+            all_features[j] in transformer.features && scitype(MLJBase.selectcols(X, j)) <: Continuous
         end
     end
     
@@ -335,7 +326,7 @@ function transform(transformer::Standardizer, fitresult, X)
 
     named_cols = NamedTuple{all_features}(tuple(cols...))
         
-    return table(named_cols, prototype=X)
+    return MLJBase.table(named_cols, prototype=X)
 
 end    
 
@@ -344,11 +335,11 @@ MLJBase.load_path(::Type{<:Standardizer}) = "MLJ.Standardizer"
 MLJBase.package_url(::Type{<:Standardizer}) = "https://github.com/alan-turing-institute/MLJ.jl"
 MLJBase.package_name(::Type{<:Standardizer}) = "MLJ"
 MLJBase.package_uuid(::Type{<:Standardizer}) = ""
-MLJBase.is_pure_julia(::Type{<:Standardizer}) = :yes
-MLJBase.input_kinds(::Type{<:Standardizer}) = [:continuous, :multiclass, :ordered_factor_finite, :ordered_factor_infinite, :missing]
-MLJBase.input_quantity(::Type{<:Standardizer}) = :multivariate
-MLJBase.output_kind(::Type{<:Standardizer}) = :mixed
-MLJBase.output_quantity(::Type{<:Standardizer}) = :multivariate
+MLJBase.is_pure_julia(::Type{<:Standardizer}) = true
+MLJBase.input_scitypes(::Type{<:Standardizer}) = Union{Found,Missing}
+MLJBase.input_is_multivariate(::Type{<:Standardizer}) = true
+MLJBase.output_scitypes(::Type{<:Standardizer}) = Union{Found,Missing}
+MLJBase.output_is_multivariate(::Type{<:Standardizer}) = true
 
 
 ## UNIVARIATE BOX-COX TRANSFORMATIONS
@@ -473,11 +464,11 @@ MLJBase.load_path(::Type{<:UnivariateBoxCoxTransformer}) = "MLJ.UnivariateBoxCox
 MLJBase.package_url(::Type{<:UnivariateBoxCoxTransformer}) = "https://github.com/alan-turing-institute/MLJ.jl"
 MLJBase.package_name(::Type{<:UnivariateBoxCoxTransformer}) = "MLJ"
 MLJBase.package_uuid(::Type{<:UnivariateBoxCoxTransformer}) = ""
-MLJBase.is_pure_julia(::Type{<:UnivariateBoxCoxTransformer}) = :yes
-MLJBase.input_kinds(::Type{<:UnivariateBoxCoxTransformer}) = [:continuous,]
-MLJBase.input_quantity(::Type{<:UnivariateBoxCoxTransformer}) = :univariate
-MLJBase.output_kind(::Type{<:UnivariateBoxCoxTransformer}) = :continuous
-MLJBase.output_quantity(::Type{<:UnivariateBoxCoxTransformer}) = :univariate
+MLJBase.is_pure_julia(::Type{<:UnivariateBoxCoxTransformer}) = true
+MLJBase.input_scitypes(::Type{<:UnivariateBoxCoxTransformer}) = MLJBase.Continuous
+MLJBase.input_is_multivariate(::Type{<:UnivariateBoxCoxTransformer}) = false
+MLJBase.output_scitypes(::Type{<:UnivariateBoxCoxTransformer}) = MLJBase.Continuous
+MLJBase.output_is_multivariate(::Type{<:UnivariateBoxCoxTransformer}) = false
 
 
 ## ONE HOT ENCODING
@@ -485,21 +476,22 @@ MLJBase.output_quantity(::Type{<:UnivariateBoxCoxTransformer}) = :univariate
 """
     OneHotEncoder(; features=Symbol[], drop_last=false, ref_type=UInt32)
 
-Unsupervised model for one-hot encoding the categorical features of
-tabular data. Here "categorical" refers to any feature whose eltype is
-`CategoricalVector`. Only categorical features in `features` are
-transformed when this is specified and non-empty. 
+Unsupervised model for one-hot encoding all features of `Multiclass`
+or `FiniteOrderedFactor` scitype, within some table. All such features
+are encoded, unless `features` is specified and non-empty.
 
 If `drop_last` is true, the column for the last level of each
 categorical feature is dropped. New data to be transformed may lack
 features present in the fit data, but no new features can be present.
 
-All categorical features to be transformed must have a type promotable
-to `ref_type`. Usually `ref_type=UInt32` suffices, but `ref_type=Int`
-will always work. 
+All categorical features to be transformed (which are necessarily of
+`CategoricalValue` or `CategoricalString` eltype) must have a reference type
+promotable to `ref_type`. Usually `ref_type=UInt32` suffices, but
+`ref_type=Int` will always work.
 
 *Warning:* This transformer assumes that a categorical feature in new
- data to be transformed will have the same pool as that encountered in the fit.
+ data to be transformed will have the same pool encountered
+ during the fit.
 
 """
 mutable struct OneHotEncoder{R<:Integer} <: Unsupervised
@@ -537,16 +529,15 @@ function fit(transformer::OneHotEncoder{R}, verbosity::Int, X) where R
     all_features = Tables.schema(X).names # a tuple not vector
     specified_features =
         isempty(transformer.features) ? collect(all_features) : transformer.features
-    all_eltypes = Tables.schema(X).types  # a tuple not vector
 
     ref_name_pairs_given_feature = Dict{Symbol,Vector{Pair{R,Symbol}}}()
 
     for j in eachindex(all_features)
         ftr = all_features[j]
-        T = all_eltypes[j]
-        if T <: Union{CategoricalValue,CategoricalString} && ftr in specified_features
+        col = MLJBase.selectcols(X,j)
+        T = scitype(col)
+        if T <: Union{Multiclass,FiniteOrderedFactor} && ftr in specified_features
             ref_name_pairs_given_feature[ftr] = Pair{R,Symbol}[]
-            col = MLJBase.selectcols(X,j)
             shift = transformer.drop_last ? 1 : 0
             if verbosity > 0
                 @info "Spawned $(length(col)-shift) sub-features to one-hot encode feature :$ftr."
@@ -613,11 +604,11 @@ MLJBase.load_path(::Type{<:OneHotEncoder}) = "MLJ.OneHotEncoder"
 MLJBase.package_url(::Type{<:OneHotEncoder}) = "https://github.com/alan-turing-institute/MLJ.jl"
 MLJBase.package_name(::Type{<:OneHotEncoder}) = "MLJ"
 MLJBase.package_uuid(::Type{<:OneHotEncoder}) = ""
-MLJBase.is_pure_julia(::Type{<:OneHotEncoder}) = :yes
-MLJBase.input_kinds(::Type{<:OneHotEncoder}) = [:continuous, :multiclass, :ordered_factor_finite, :ordered_factor_infinite, :missing]
-MLJBase.input_quantity(::Type{<:OneHotEncoder}) = :multivariate
-MLJBase.output_kind(::Type{<:OneHotEncoder}) = :mixed
-MLJBase.output_quantity(::Type{<:OneHotEncoder}) = :multivariate
+MLJBase.is_pure_julia(::Type{<:OneHotEncoder}) = true
+MLJBase.input_scitypes(::Type{<:OneHotEncoder}) = Union{Missing,Found}
+MLJBase.input_is_multivariate(::Type{<:OneHotEncoder}) = true
+MLJBase.output_scitypes(::Type{<:OneHotEncoder}) = Union{Missing,Found}
+MLJBase.output_is_multivariate(::Type{<:OneHotEncoder}) = true
 
 
 end # end module

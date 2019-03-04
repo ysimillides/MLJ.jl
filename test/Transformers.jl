@@ -50,37 +50,41 @@ fitresult, cache, report = MLJBase.fit(stand, 1, [0, 2, 4])
 @test round.(Int, inverse_transform(stand, fitresult, [-1, 1, 3])) == [0, 4, 8] 
 
 # `Standardizer`:
-X, y = X_and_y(load_ames())
-X = DataFrame(X) # will be redundant in DataFrames 0.17.0
-X = X[1:4,1:4]
+X, y = X_and_y(load_reduced_ames())
+X = selectrows(X, 1:5)
+X = selectcols(X, 1:5)
 train, test = partition(eachindex(y), 0.9);
 
 # introduce a field of type `Char`:
-X[:OverallQual] = map(Char, X[:OverallQual]);
+x1 = categorical(map(Char, (X.OverallQual |> collect)))
 
 # introduce field of Int type:
-X[:x1stFlrSF] = [round(Int, x) for x in X[:x1stFlrSF]]
+x4 = [round(Int, x) for x in X.x1stFlrSF]
+
+X = (x1=x1, x2=X[2], x3=X[3], x4=x4, x5=X[5])
 
 stand = Standardizer()
 info(stand)
 fitresult, cache, report = MLJBase.fit(stand, 1, X)
 Xnew = transform(stand, fitresult, X)
-@test std(Xnew[2]) ≈ 1.0
 @test Xnew[1] == X[1]
+@test std(Xnew[2]) ≈ 1.0
 @test Xnew[3] == X[3]
 @test Xnew[4] == X[4]
+@test std(Xnew[5]) ≈ 1.0
 
-stand.features = names(X)
+stand.features = [:x1, :x5]
 fitresult, cache, report = MLJBase.fit(stand, 1, X)
 Xnew = transform(stand, fitresult, X)
 
 fitresult, cache, report = MLJBase.fit(stand, 1, X)
-@test issubset(Set(keys(fitresult)), Set(names(X)[[2,4]]))
+@test issubset(Set(keys(fitresult)), Set(MLJBase.schema(X).names[[5,]]))
 transform(stand, fitresult, X)
 @test Xnew[1] == X[1]
+@test Xnew[2] == X[2]
 @test Xnew[3] == X[3]
-@test std(Xnew[2]) ≈ 1.0
-@test std(Xnew[4]) ≈ 1.0
+@test Xnew[4] == X[4]
+@test std(Xnew[5]) ≈ 1.0
 
 # `UnivariateBoxCoxTransformer`
 
