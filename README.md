@@ -5,6 +5,9 @@ A pure Julia machine learning framework.
 [![Build Status](https://travis-ci.com/alan-turing-institute/MLJ.jl.svg?branch=master)](https://travis-ci.com/alan-turing-institute/MLJ.jl)
 [![Slack Channel mlj](https://img.shields.io/badge/chat-on%20slack-yellow.svg)](https://slackinvite.julialang.org/)
 
+[![](https://img.shields.io/badge/docs-stable-blue.svg)](https://ysimillides.github.io/MLJ.jl/stable)
+[![](https://img.shields.io/badge/docs-dev-blue.svg)](https://ysimillides.github.io/MLJ.jl/dev)
+
 ![](doc/two_model_stack.png)
 
 MLJ aims to be a flexible framework for combining and tuning machine
