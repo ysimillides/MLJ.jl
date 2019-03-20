@@ -18,7 +18,7 @@ makedocs(
     format = Documenter.HTML(),
     modules = [MLJ,MLJBase,MLJModels],
     pages = Any["Launch Pad"=>"getting_started.md","Scientific_Data_types"=>"scientific_data_types.md","Adding new Models"=>
-"adding_new_models.md","Internals"=>"internals.md","Glossary"=>"glossary.md","News"=>"NEWS.md","MLJ.jl"=>"index.md"]
+"Adding New Models.md","Internals"=>"internals.md","Glossary"=>"glossary.md","News"=>"NEWS.md","MLJ.jl"=>"index.md"]
 )
 
 deploydocs(
